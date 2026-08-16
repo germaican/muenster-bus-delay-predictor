@@ -5,16 +5,43 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 import requests
+import os
+import io
 
 app = Flask(__name__)
 CORS(app)
 
-# Modell laden
-modell = joblib.load("random_forest_modell_v2.pkl")
-stop_means = joblib.load("stop_means_lookup.pkl")
-global_mean = float(np.mean(list(stop_means.values())))
+# ── Modell von Google Drive laden ─────────────────────────────────────────────
+def laden_von_gdrive(file_id: str):
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    session = requests.Session()
+    r = session.get(url, stream=True)
+    
+    # Bei großen Dateien: Bestätigungs-Token verarbeiten
+    token = None
+    for key, value in r.cookies.items():
+        if key.startswith("download_warning"):
+            token = value
+    if token:
+        r = session.get(url, params={"confirm": token}, stream=True)
+    
+    buffer = io.BytesIO()
+    for chunk in r.iter_content(chunk_size=32768):
+        if chunk:
+            buffer.write(chunk)
+    buffer.seek(0)
+    return joblib.load(buffer)
 
-# Wetter von Open-Meteo abrufen
+print("Lade Modell von Google Drive ...")
+MODELL_ID     = "14cNkND8oRmdh2NWQ7THryMarh37PD95h"
+STOP_MEANS_ID = "1vDvL-aYXBRaEyaRf6UJLNblxnSX0db03"
+
+modell     = laden_von_gdrive(MODELL_ID)
+stop_means = laden_von_gdrive(STOP_MEANS_ID)
+global_mean = float(np.mean(list(stop_means.values())))
+print("Modell erfolgreich geladen!")
+
+# ── Wetter von Open-Meteo abrufen ─────────────────────────────────────────────
 def wetter_abrufen(datum: str, stunde: int) -> dict:
     try:
         url = (
@@ -46,7 +73,7 @@ def wetter_abrufen(datum: str, stunde: int) -> dict:
             "wind_speed_10m (km/h)":      10.0,
         }
 
-# Schulferien NRW
+# ── Schulferien NRW ───────────────────────────────────────────────────────────
 FERIEN_NRW_2026 = [
     ("2026-07-20", "2026-09-01"),
     ("2026-10-05", "2026-10-17"),
@@ -60,36 +87,27 @@ def ist_schulferien(datum_str: str) -> int:
             return 1
     return 0
 
-# Verfügbare Feature-Spalten (aus Training)
-FEATURE_COLS = None
-
+# ── Vorhersage-Endpoint ───────────────────────────────────────────────────────
 @app.route("/predict", methods=["POST"])
 def predict():
-    global FEATURE_COLS
-
-    data = request.json
+    data       = request.json
     linie      = str(data.get("linie", "2"))
-    datum      = data.get("datum")        # z.B. "2026-08-25"
+    datum      = data.get("datum")
     stunde     = int(data.get("stunde", 8))
     minute     = int(data.get("minute", 0))
     stop_id    = data.get("stop_id", None)
 
-    # Wochentag berechnen
-    dt = datetime.strptime(datum, "%Y-%m-%d")
-    wochentag = dt.weekday()  # 0=Mo, 6=So
+    dt        = datetime.strptime(datum, "%Y-%m-%d")
+    wochentag = dt.weekday()
 
-    # Wetter abrufen
-    wetter = wetter_abrufen(datum, stunde)
-
-    # Features berechnen
-    hour_sin   = np.sin(2 * np.pi * stunde / 24.0)
-    hour_cos   = np.cos(2 * np.pi * stunde / 24.0)
-    is_rush    = int((7 <= stunde <= 9 or 16 <= stunde <= 18) and wochentag < 5)
-    rain_rush  = wetter["rain (mm)"] * is_rush
+    wetter      = wetter_abrufen(datum, stunde)
+    hour_sin    = np.sin(2 * np.pi * stunde / 24.0)
+    hour_cos    = np.cos(2 * np.pi * stunde / 24.0)
+    is_rush     = int((7 <= stunde <= 9 or 16 <= stunde <= 18) and wochentag < 5)
+    rain_rush   = wetter["rain (mm)"] * is_rush
     schulferien = ist_schulferien(datum)
     stop_encoded = stop_means.get(str(stop_id), global_mean) if stop_id else global_mean
 
-    # Basiseingabe
     eingabe = {
         "Direction_ID":               1,
         "hour_sin":                   hour_sin,
@@ -107,11 +125,7 @@ def predict():
         "Current_Stop_Encoded":       stop_encoded,
     }
 
-    # Feature-Spalten beim ersten Aufruf laden
-    if FEATURE_COLS is None:
-        FEATURE_COLS = modell.feature_names_in_
-
-    # One-Hot Encoding
+    FEATURE_COLS = modell.feature_names_in_
     for col in FEATURE_COLS:
         if col.startswith("Line_"):
             eingabe[col] = 1 if col == f"Line_{linie}" else 0
@@ -128,11 +142,11 @@ def predict():
     delay = float(modell.predict(df_eingabe)[0])
 
     return jsonify({
-        "linie":      linie,
-        "datum":      datum,
-        "uhrzeit":    f"{stunde:02d}:{minute:02d}",
-        "delay_min":  round(delay, 1),
-        "wetter":     wetter,
+        "linie":       linie,
+        "datum":       datum,
+        "uhrzeit":     f"{stunde:02d}:{minute:02d}",
+        "delay_min":   round(delay, 1),
+        "wetter":      wetter,
         "schulferien": bool(schulferien),
     })
 
