@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Münster Bus Verspätungsvorhersage</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f0f4f8;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .header h1 {
+            font-size: 24px;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+        .bus-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        select, input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            color: #333;
+            background: white;
+            transition: border-color 0.2s;
+        }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #4361ee;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #4361ee;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 8px;
+        }
+        button:hover { background: #3451d1; }
+        button:disabled { background: #a0aec0; cursor: not-allowed; }
+        .result {
+            margin-top: 24px;
+            padding: 24px;
+            border-radius: 12px;
+            text-align: center;
+            display: none;
+        }
+        .result.show { display: block; }
+        .result.punctual {
+            background: #f0fff4;
+            border: 2px solid #48bb78;
+        }
+        .result.slight {
+            background: #fffbeb;
+            border: 2px solid #f6ad55;
+        }
+        .result.delayed {
+            background: #fff5f5;
+            border: 2px solid #fc8181;
+        }
+        .result-delay {
+            font-size: 48px;
+            font-weight: 700;
+            margin: 8px 0;
+        }
+        .result.punctual .result-delay { color: #38a169; }
+        .result.slight .result-delay { color: #d69e2e; }
+        .result.delayed .result-delay { color: #e53e3e; }
+        .result-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .result-status {
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        .result-details {
+            font-size: 13px;
+            color: #888;
+            margin-top: 12px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            display: none;
+        }
+        .loading.show { display: block; }
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #4361ee;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error {
+            margin-top: 16px;
+            padding: 12px;
+            background: #fff5f5;
+            border: 1px solid #fc8181;
+            border-radius: 8px;
+            color: #c53030;
+            font-size: 14px;
+            display: none;
+        }
+        .error.show { display: block; }
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 12px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="bus-icon">🚌</div>
+            <h1>Bus Verspätungsvorhersage</h1>
+            <p>Münster · Stadtwerke Buslinien</p>
+        </div>
+
+        <div class="form-group">
+            <label for="linie">Buslinie</label>
+            <select id="linie">
+                <option value="2">Linie 2</option>
+                <option value="5">Linie 5</option>
+                <option value="8">Linie 8</option>
+                <option value="10">Linie 10</option>
+                <option value="14">Linie 14</option>
+                <option value="15">Linie 15</option>
+                <option value="17">Linie 17</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="datum">Datum</label>
+            <input type="date" id="datum">
+        </div>
+
+        <div class="row">
+            <div class="form-group">
+                <label for="stunde">Stunde</label>
+                <select id="stunde">
+                    <!-- Wird per JS befüllt -->
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="minute">Minute</label>
+                <select id="minute">
+                    <!-- Wird per JS befüllt -->
+                </select>
+            </div>
+        </div>
+
+        <button id="btn" onclick="vorhersageAbrufen()">
+            Verspätung vorhersagen
+        </button>
+
+        <div class="loading" id="loading">
+            <span class="spinner"></span> Vorhersage wird berechnet...
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="result" id="result">
+            <div class="result-label">Voraussichtliche Verspätung</div>
+            <div class="result-delay" id="result-delay">0 Min</div>
+            <div class="result-status" id="result-status"></div>
+            <div class="result-details" id="result-details"></div>
+        </div>
+
+        <div class="footer">
+            Powered by Random Forest · Daten: Stadtwerke Münster
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://muenster-bus-delay-predictor.onrender.com";
+
+        // Datum auf heute setzen
+        const today = new Date();
+        document.getElementById("datum").value = today.toISOString().split("T")[0];
+        document.getElementById("datum").min = today.toISOString().split("T")[0];
+
+        // Stunden befüllen
+        const stundeSelect = document.getElementById("stunde");
+        for (let h = 0; h < 24; h++) {
+            const opt = document.createElement("option");
+            opt.value = h;
+            opt.text = h.toString().padStart(2, "0") + ":00";
+            if (h === today.getHours()) opt.selected = true;
+            stundeSelect.appendChild(opt);
+        }
+
+        // Minuten befüllen
+        const minuteSelect = document.getElementById("minute");
+        for (let m = 0; m < 60; m += 5) {
+            const opt = document.createElement("option");
+            opt.value = m;
+            opt.text = m.toString().padStart(2, "0");
+            minuteSelect.appendChild(opt);
+        }
+
+        async function vorhersageAbrufen() {
+            const btn = document.getElementById("btn");
+            const loading = document.getElementById("loading");
+            const result = document.getElementById("result");
+            const error = document.getElementById("error");
+
+            // UI zurücksetzen
+            result.classList.remove("show");
+            error.classList.remove("show");
+            loading.classList.add("show");
+            btn.disabled = true;
+
+            const payload = {
+                linie:  document.getElementById("linie").value,
+                datum:  document.getElementById("datum").value,
+                stunde: parseInt(document.getElementById("stunde").value),
+                minute: parseInt(document.getElementById("minute").value),
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/predict`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!response.ok) throw new Error("Server-Fehler");
+
+                const data = await response.json();
+                const delay = data.delay_min;
+
+                // Ergebnis anzeigen
+                document.getElementById("result-delay").textContent =
+                    delay <= 0 ? "Pünktlich" : `+${delay.toFixed(1)} Min`;
+
+                let statusText = "";
+                let cssClass = "";
+                if (delay <= 0) {
+                    statusText = "✅ Der Bus fährt voraussichtlich pünktlich ab!";
+                    cssClass = "punctual";
+                } else if (delay <= 3) {
+                    statusText = "🟡 Leichte Verspätung erwartet";
+                    cssClass = "slight";
+                } else {
+                    statusText = "🔴 Deutliche Verspätung erwartet";
+                    cssClass = "delayed";
+                }
+
+                document.getElementById("result-status").textContent = statusText;
+                document.getElementById("result-details").textContent =
+                    `Linie ${data.linie} · ${data.datum} · ${data.uhrzeit} Uhr · ` +
+                    `${data.wetter["temperature_2m (°C)"].toFixed(1)}°C · ` +
+                    `${data.schulferien ? "Schulferien" : "Schule"}`;
+
+                result.className = `result show ${cssClass}`;
+            } catch (e) {
+                error.textContent = "Fehler bei der Vorhersage. Bitte versuche es erneut. " +
+                    "(Hinweis: Der Server braucht beim ersten Aufruf ca. 30 Sekunden zum Starten)";
+                error.classList.add("show");
+            } finally {
+                loading.classList.remove("show");
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
