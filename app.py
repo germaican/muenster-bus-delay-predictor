@@ -13,11 +13,11 @@ CORS(app)
 
 # ── Modell von Google Drive laden ─────────────────────────────────────────────
 def laden_von_gdrive(file_id: str):
+    import pickle
     url = f"https://drive.google.com/uc?export=download&id={file_id}"
     session = requests.Session()
     r = session.get(url, stream=True)
     
-    # Bei großen Dateien: Bestätigungs-Token verarbeiten
     token = None
     for key, value in r.cookies.items():
         if key.startswith("download_warning"):
@@ -30,7 +30,7 @@ def laden_von_gdrive(file_id: str):
         if chunk:
             buffer.write(chunk)
     buffer.seek(0)
-    return joblib.load(buffer)
+    return pickle.load(buffer)
 
 print("Lade Modell von Google Drive ...")
 MODELL_ID     = "14cNkND8oRmdh2NWQ7THryMarh37PD95h"
