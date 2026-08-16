@@ -1,8 +1,8 @@
 flask
 flask-cors
-joblib
+joblib==1.5.3
 numpy
 pandas
-scikit-learn
+scikit-learn==1.6.1
 requests
 gunicorn
