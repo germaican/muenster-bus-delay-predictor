@@ -42,8 +42,8 @@ def laden_von_gdrive(file_id: str):
     return pickle.load(buffer)
 
 print("Lade Modell von Google Drive ...")
-MODELL_ID     = "14cNkND8oRmdh2NWQ7THryMarh37PD95h"
-STOP_MEANS_ID = "1vDvL-aYXBRaEyaRf6UJLNblxnSX0db03"
+MODELL_ID     = "1SJ46E8du92ssGLhg_YHximPUUyDFDUID"
+STOP_MEANS_ID = "1yZr-oJ_5Wj4FWr_QIjE6JpWv7-WxRNzK"
 
 modell     = laden_von_gdrive(MODELL_ID)
 stop_means = laden_von_gdrive(STOP_MEANS_ID)
