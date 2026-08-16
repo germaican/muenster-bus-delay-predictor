@@ -47,7 +47,10 @@ STOP_MEANS_ID = "1yZr-oJ_5Wj4FWr_QIjE6JpWv7-WxRNzK"
 
 modell     = laden_von_gdrive(MODELL_ID)
 stop_means = laden_von_gdrive(STOP_MEANS_ID)
-global_mean = float(np.mean(list(stop_means.values())))
+if isinstance(stop_means, dict):
+    global_mean = float(np.mean(list(stop_means.values())))
+else:
+    global_mean = float(np.mean(stop_means))
 print("Modell erfolgreich geladen!")
 
 # ── Wetter von Open-Meteo abrufen ─────────────────────────────────────────────
