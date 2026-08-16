@@ -14,16 +14,25 @@ CORS(app)
 # ── Modell von Google Drive laden ─────────────────────────────────────────────
 def laden_von_gdrive(file_id: str):
     import pickle
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    session = requests.Session()
-    r = session.get(url, stream=True)
+    from bs4 import BeautifulSoup
     
-    token = None
-    for key, value in r.cookies.items():
-        if key.startswith("download_warning"):
-            token = value
-    if token:
-        r = session.get(url, params={"confirm": token}, stream=True)
+    session = requests.Session()
+    
+    # Erste Anfrage um den Bestätigungs-Token zu holen
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    r = session.get(url)
+    
+    # Token aus HTML extrahieren
+    soup = BeautifulSoup(r.text, "html.parser")
+    form = soup.find("form")
+    
+    if form:
+        # Direkte Download-URL mit Token verwenden
+        download_url = "https://drive.usercontent.google.com/download"
+        params = {"id": file_id, "export": "download", "confirm": "t"}
+        r = session.get(download_url, params=params, stream=True)
+    else:
+        r = session.get(url, stream=True)
     
     buffer = io.BytesIO()
     for chunk in r.iter_content(chunk_size=32768):
